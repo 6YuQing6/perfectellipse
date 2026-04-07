@@ -1,0 +1,33 @@
+@font-face {
+  font-family: "LowerPixel"; /* Define a name for the font */
+  src: url("lower-pixel.regular.otf") format("opentype"); /* Path to your .otf file */
+  font-weight: normal;
+  font-style: normal;
+}
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  background: #0f0f13;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-family: "Playpen Sans", "LowerPixel", "Pixelify Sans", sans-serif;
+  color: #fff;
+  overflow: hidden;
+}
+#canvas-wrap {
+  position: relative;
+}
+canvas {
+  display: block;
+  cursor: crosshair;
+  position: fixed;
+  top: 0;
+  left: 0;
+  image-rendering: pixelated;
+}
