@@ -1,6 +1,6 @@
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
-
+const historyEl = document.getElementById("history");
 // fix bluriness
 // https://medium.com/wdstack/fixing-html5-2d-canvas-blur-8ebe27db07da
 const dpi = window.devicePixelRatio || 1;
@@ -23,6 +23,7 @@ let A, B, angle;
 let liveScore = null;
 let highScore = 0;
 let newHighScore = false;
+let history = [];
 
 function randEllipse() {
   A = W * 0.18 + Math.random() * (W * 0.05);
@@ -43,10 +44,6 @@ function ellipsePoint(t) {
 
 // Score: for each drawn point, find nearest point on ellipse via angle in ellipse space
 function calcScore() {
-  console.log(path.length);
-  console.log(beginPoint);
-  console.log(endPoint);
-
   // if end point too far from ellipse, player is going wrong way, so score is 0
   if (pointError(beginPoint[0], beginPoint[1]) > 80) return 0;
   if (endPoint && pointError(endPoint[0], endPoint[1]) > 80) return 0;
@@ -177,11 +174,19 @@ function drawCenterScore(pct, isGameOver) {
       ctx.textAlign = "center";
       ctx.fillText("Try Again", cx, cy + 42);
     }
+    if (history.length > 1) {
+      const avg = history.reduce((a, b) => a + b, 0) / history.length;
+      ctx.font = `24px 'Playpen Sans', sans-serif`;
+      ctx.fillStyle = "#ffffff";
+      ctx.globalAlpha = 1;
+      ctx.textAlign = "center";
+      ctx.fillText(`Average: ${avg.toFixed(1)}%`, cx, cy + 84);
+    }
     ctx.font = `20px  'Playpen Sans', sans-serif`;
     ctx.fillStyle = "#ffffff";
     ctx.globalAlpha = 1;
     ctx.textAlign = "center";
-    ctx.fillText("Press anywhere to play again", cx, cy + 92);
+    ctx.fillText("Press anywhere to play again", cx, cy + 130);
   }
   ctx.restore();
 }
@@ -214,9 +219,9 @@ function drawPath(pts) {
   ctx.lineWidth = 2;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  const maxW = 5,
-    minW = 3,
-    taperPts = 80;
+  const maxW = 6,
+    minW = 4,
+    taperPts = 40;
   for (let i = 1; i < pts.length; i++) {
     const t = Math.min(i / taperPts, 1);
     const w = maxW + (minW - maxW) * t;
@@ -303,14 +308,6 @@ function onUp(e) {
     Math.hypot(beginPoint[0] - endPoint[0], beginPoint[1] - endPoint[1]) > 100
   ) {
     liveScore = 0;
-  } else if (
-    beginPoint &&
-    endPoint &&
-    Math.hypot(beginPoint[0] - endPoint[0], beginPoint[1] - endPoint[1]) <=
-      100 &&
-    path.length < 100
-  ) {
-    liveScore = 0;
   } else {
     liveScore = calcScore();
   }
@@ -319,6 +316,9 @@ function onUp(e) {
     newHighScore = true;
   } else {
     newHighScore = false;
+  }
+  if (liveScore > 0) {
+    history.push(liveScore);
   }
   render();
 }
