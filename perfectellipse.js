@@ -16,6 +16,8 @@ const cx = W / 2,
 
 let drawing = false;
 let path = [];
+let beginPoint = null;
+let endPoint = null;
 let gameOver = false;
 let A, B, angle;
 let liveScore = null;
@@ -41,7 +43,13 @@ function ellipsePoint(t) {
 
 // Score: for each drawn point, find nearest point on ellipse via angle in ellipse space
 function calcScore() {
-  if (path.length < 10) return 0;
+  console.log(path.length);
+  console.log(beginPoint);
+  console.log(endPoint);
+
+  // if end point too far from ellipse, player is going wrong way, so score is 0
+  if (pointError(beginPoint[0], beginPoint[1]) > 80) return 0;
+  if (endPoint && pointError(endPoint[0], endPoint[1]) > 80) return 0;
   let totalErr = 0;
   const cosA = Math.cos(-angle),
     sinA = Math.sin(-angle);
@@ -58,7 +66,7 @@ function calcScore() {
   const avgErr = totalErr / path.length;
   return Math.max(0, Math.min(100, 100 - (avgErr / 40) * 100));
 }
-// 134	167	80
+
 function scoreColor(pct) {
   if (pct >= 99) return "#00ff88"; // S  — bright green
   if (pct >= 90) return "rgb(57, 255, 0)"; // A+ — soft green
@@ -68,7 +76,7 @@ function scoreColor(pct) {
   return "rgb(255, 29, 0)"; // F  — red
 }
 
-function drawGuide(dimmed) {
+function drawGuide(isGameOver) {
   const cos = Math.cos(angle),
     sin = Math.sin(angle);
   ctx.save();
@@ -85,7 +93,7 @@ function drawGuide(dimmed) {
   ctx.lineTo(cx + (B + 18) * -sin, cy + (B + 18) * cos);
   ctx.stroke();
 
-  if (dimmed) {
+  if (isGameOver) {
     // Dashed ellipse — only at game over
     ctx.beginPath();
     ctx.ellipse(cx, cy, A, B, angle, 0, Math.PI * 2);
@@ -109,7 +117,7 @@ function drawGuide(dimmed) {
   ctx.restore();
 }
 
-function drawCenterScore(pct, final) {
+function drawCenterScore(pct, isGameOver) {
   const label = pct.toFixed(1) + "%";
   const size = 64;
   ctx.save();
@@ -119,13 +127,13 @@ function drawCenterScore(pct, final) {
   ctx.globalAlpha = 1;
   ctx.fillStyle = scoreColor(pct);
   // Glow on new high score
-  if (final && newHighScore) {
+  if (isGameOver && newHighScore) {
     ctx.shadowColor = scoreColor(pct);
     ctx.shadowBlur = 30;
   }
   ctx.fillText(label, cx, cy - 10);
   ctx.shadowBlur = 0;
-  if (final) {
+  if (isGameOver) {
     // High score
     if (highScore > 0) {
       if (newHighScore) {
@@ -163,12 +171,17 @@ function drawCenterScore(pct, final) {
         ctx.fillStyle = scoreColor(highScore);
         ctx.fillText(numStr, startX + bestWidth, cy + 42);
       }
+    } else {
+      ctx.font = `24px 'Playpen Sans', sans-serif`;
+      ctx.fillStyle = "#ff1212";
+      ctx.textAlign = "center";
+      ctx.fillText("Try Again", cx, cy + 42);
     }
     ctx.font = `20px  'Playpen Sans', sans-serif`;
     ctx.fillStyle = "#ffffff";
     ctx.globalAlpha = 1;
     ctx.textAlign = "center";
-    ctx.fillText("press anywhere to try again", cx, cy + 92);
+    ctx.fillText("Press anywhere to play again", cx, cy + 92);
   }
   ctx.restore();
 }
@@ -185,7 +198,7 @@ function pointError(px, py) {
   return Math.hypot(px - ix, py - iy);
 }
 
-function errToColor(err, dimmed) {
+function errToColor(err) {
   const maxErr = 40;
   const t = Math.min(err / maxErr, 1);
   const r = Math.round(80 + 175 * t);
@@ -195,14 +208,14 @@ function errToColor(err, dimmed) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
-function drawPath(pts, dimmed) {
+function drawPath(pts) {
   if (pts.length < 2) return;
   ctx.save();
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 2;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  const maxW = 7,
-    minW = 5,
+  const maxW = 5,
+    minW = 3,
     taperPts = 80;
   for (let i = 1; i < pts.length; i++) {
     const t = Math.min(i / taperPts, 1);
@@ -212,7 +225,7 @@ function drawPath(pts, dimmed) {
     ctx.moveTo(pts[i - 1][0], pts[i - 1][1]);
     ctx.lineTo(pts[i][0], pts[i][1]);
     ctx.lineWidth = w;
-    ctx.strokeStyle = errToColor(err, dimmed);
+    ctx.strokeStyle = errToColor(err);
     ctx.stroke();
   }
   ctx.restore();
@@ -232,7 +245,7 @@ function render() {
   ctx.clearRect(0, 0, W, H);
   const showScore = liveScore !== null;
   drawGuide(gameOver);
-  drawPath(path, gameOver);
+  drawPath(path);
   drawCenterDot(showScore); // hide dot when score shown
   if (showScore) drawCenterScore(liveScore, gameOver);
 }
@@ -262,6 +275,7 @@ function onDown(e) {
   if (drawing) return;
   drawing = true;
   path = [getPos(e)];
+  beginPoint = path[0];
   liveScore = 0;
   render();
 }
@@ -270,7 +284,11 @@ function onMove(e) {
   e.preventDefault();
   if (!drawing || gameOver) return;
   path.push(getPos(e));
+  endPoint = path[path.length - 1];
   liveScore = calcScore();
+  if (liveScore <= 0) {
+    gameOver = true;
+  }
   render();
 }
 
@@ -279,7 +297,23 @@ function onUp(e) {
   if (!drawing || gameOver) return;
   drawing = false;
   gameOver = true;
-  liveScore = calcScore();
+  if (
+    beginPoint &&
+    endPoint &&
+    Math.hypot(beginPoint[0] - endPoint[0], beginPoint[1] - endPoint[1]) > 100
+  ) {
+    liveScore = 0;
+  } else if (
+    beginPoint &&
+    endPoint &&
+    Math.hypot(beginPoint[0] - endPoint[0], beginPoint[1] - endPoint[1]) <=
+      100 &&
+    path.length < 100
+  ) {
+    liveScore = 0;
+  } else {
+    liveScore = calcScore();
+  }
   if (liveScore > highScore) {
     highScore = liveScore;
     newHighScore = true;
